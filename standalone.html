@@ -1,0 +1,2401 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Monuments de France — Cartographie 3D, Intérieurs & Relief</title>
+  <meta name="description" content="Visualisation cartographique 3D des grands édifices du patrimoine historique français hors Paris, avec exploration des intérieurs et panoramas de montagne." />
+  
+  <!-- CesiumJS Official CDN -->
+  <link href="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Widgets/widgets.css" rel="stylesheet" />
+  <script src="https://cesium.com/downloads/cesiumjs/releases/1.119/Build/Cesium/Cesium.js"></script>
+
+  <style>
+    *, *::before, *::after {
+      box-sizing: border-box;
+    }
+    html, body {
+      margin: 0;
+      padding: 0;
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Helvetica Neue", Arial, sans-serif;
+      background-color: #000000;
+      color: #ffffff;
+      -webkit-font-smoothing: antialiased;
+    }
+    #cesiumContainer {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      background: #000000;
+    }
+    .cesium-widget-credits,
+    .cesium-credit-logoContainer,
+    .cesium-credit-textContainer {
+      display: none !important;
+    }
+
+    /* HUD Overlay - 7px Border Radius, Pure Monochrome */
+    .hud-panel {
+      position: absolute;
+      top: 24px;
+      left: 24px;
+      z-index: 20;
+      width: 440px;
+      max-width: calc(100vw - 48px);
+      max-height: calc(100vh - 48px);
+      overflow-y: auto;
+      padding: 24px;
+      background: rgba(0, 0, 0, 0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 7px;
+      box-shadow: 0 16px 48px rgba(0, 0, 0, 0.85);
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+
+    .header-top-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .institution-eyebrow {
+      font-size: 0.66rem;
+      font-weight: 700;
+      letter-spacing: 0.12em;
+      text-transform: uppercase;
+      color: #888888;
+    }
+    .lang-switcher {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      background: #111111;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      border-radius: 7px;
+      padding: 2px 6px;
+    }
+    .lang-btn {
+      background: transparent;
+      border: none;
+      color: #777777;
+      font-size: 0.7rem;
+      font-weight: 600;
+      padding: 2px 4px;
+      cursor: pointer;
+      border-radius: 4px;
+      transition: color 0.15s, background-color 0.15s;
+    }
+    .lang-btn.active {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.16);
+    }
+    .lang-sep {
+      color: #444444;
+      font-size: 0.65rem;
+    }
+
+    h1 {
+      margin: 4px 0 0 0;
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      color: #ffffff;
+    }
+    .subtitle {
+      margin: 0;
+      font-size: 0.8rem;
+      line-height: 1.45;
+      color: #999999;
+    }
+
+    .control-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #0a0a0a;
+      padding: 14px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+    }
+    .selector-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+    .field-label {
+      font-size: 0.68rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #cccccc;
+    }
+    .counter-tag {
+      font-size: 0.68rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #888888;
+    }
+    select {
+      width: 100%;
+      padding: 10px 12px;
+      background-color: #000000;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+      border-radius: 7px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      cursor: pointer;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    select:focus {
+      border-color: #ffffff;
+    }
+    select:disabled {
+      opacity: 0.45;
+      cursor: not-allowed;
+    }
+
+    .stepper-buttons {
+      display: flex;
+      gap: 8px;
+    }
+    .btn {
+      padding: 8px 12px;
+      border-radius: 7px;
+      font-size: 0.8rem;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      outline: none;
+      transition: background-color 0.15s, border-color 0.15s;
+    }
+    .btn:disabled {
+      opacity: 0.4;
+      cursor: not-allowed;
+    }
+    .btn-secondary {
+      background: #141414;
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.18);
+      flex: 1;
+    }
+    .btn-secondary:hover:not(:disabled) {
+      background: #222222;
+      border-color: rgba(255, 255, 255, 0.35);
+    }
+    .btn-accent {
+      background: #ffffff;
+      color: #000000;
+      border: 1px solid #ffffff;
+      flex: 1.1;
+    }
+    .btn-accent:hover:not(:disabled) {
+      background: #e0e0e0;
+    }
+    .btn-active {
+      background: #000000;
+      color: #ffffff;
+      border: 1px solid #ffffff;
+      flex: 1.1;
+    }
+
+    /* Perspective Tabs */
+    .view-mode-tabs {
+      display: flex;
+      gap: 4px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 7px;
+      padding: 3px;
+      margin-top: 4px;
+    }
+    .view-tab-btn {
+      flex: 1;
+      background: transparent;
+      border: none;
+      color: #888888;
+      font-size: 0.72rem;
+      font-weight: 600;
+      padding: 7px 6px;
+      border-radius: 4px;
+      cursor: pointer;
+      text-align: center;
+      transition: all 0.18s ease;
+    }
+    .view-tab-btn.active {
+      background: #ffffff;
+      color: #000000;
+      font-weight: 700;
+    }
+    .view-tab-btn:hover:not(.active) {
+      color: #ffffff;
+      background: rgba(255, 255, 255, 0.08);
+    }
+
+    .layer-switcher-row {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 4px;
+      padding-top: 8px;
+      border-top: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .layer-label {
+      font-size: 0.65rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: #888888;
+    }
+    .layer-btn-group {
+      display: inline-flex;
+      gap: 4px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      border-radius: 7px;
+      padding: 2px;
+    }
+    .layer-btn {
+      background: transparent;
+      border: none;
+      color: #777777;
+      font-size: 0.68rem;
+      font-weight: 600;
+      letter-spacing: 0.04em;
+      padding: 3px 8px;
+      border-radius: 4px;
+      cursor: pointer;
+      transition: color 0.15s, background-color 0.15s;
+    }
+    .layer-btn.active {
+      background: rgba(255, 255, 255, 0.16);
+      color: #ffffff;
+    }
+
+    .monument-card {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      background: #0a0a0a;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 7px;
+      padding: 16px;
+    }
+    .card-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 6px;
+    }
+    .city-label {
+      font-size: 0.7rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      color: #ffffff;
+    }
+    .department-label {
+      font-size: 0.7rem;
+      color: #888888;
+    }
+    .section-pill {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.1em;
+      text-transform: uppercase;
+      color: #000000;
+      background: #ffffff;
+      padding: 2px 7px;
+      border-radius: 4px;
+    }
+    .monument-title {
+      margin: 2px 0 0 0;
+      font-size: 1.15rem;
+      font-weight: 700;
+      line-height: 1.35;
+      color: #ffffff;
+    }
+    .meta-line {
+      display: flex;
+      gap: 6px;
+      font-size: 0.76rem;
+    }
+    .meta-term {
+      color: #888888;
+      font-weight: 600;
+    }
+    .meta-desc {
+      color: #e0e0e0;
+    }
+    .monument-desc {
+      margin: 0;
+      font-size: 0.8rem;
+      line-height: 1.5;
+      color: #d0d0d0;
+    }
+
+    .media-frame {
+      position: relative;
+      width: 100%;
+      height: 200px;
+      background: #000000;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+    }
+    .monument-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .quick-preview-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 8px;
+      margin-top: 2px;
+    }
+    .preview-card {
+      position: relative;
+      height: 72px;
+      border-radius: 7px;
+      overflow: hidden;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      cursor: pointer;
+      background: #000000;
+      transition: border-color 0.18s, transform 0.15s;
+    }
+    .preview-card:hover {
+      border-color: #ffffff;
+      transform: translateY(-1px);
+    }
+    .preview-thumb {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      opacity: 0.75;
+      transition: opacity 0.2s, transform 0.25s;
+    }
+    .preview-card:hover .preview-thumb {
+      opacity: 0.95;
+      transform: scale(1.05);
+    }
+    .preview-label {
+      position: absolute;
+      bottom: 0;
+      left: 0;
+      right: 0;
+      background: linear-gradient(transparent, rgba(0, 0, 0, 0.92));
+      font-size: 0.64rem;
+      font-weight: 700;
+      padding: 14px 6px 4px 6px;
+      color: #ffffff;
+    }
+
+    .historical-note-box {
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
+      background: rgba(255, 255, 255, 0.03);
+      border-left: 2px solid #ffffff;
+      padding: 8px 12px;
+      border-radius: 0 7px 7px 0;
+      border-top: 1px solid rgba(255, 255, 255, 0.06);
+      border-right: 1px solid rgba(255, 255, 255, 0.06);
+      border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    }
+    .historical-note-title {
+      font-size: 0.65rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #999999;
+    }
+    .historical-note-text {
+      margin: 0;
+      font-size: 0.76rem;
+      line-height: 1.45;
+      color: #e5e5e5;
+    }
+
+    .coords-strip {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      padding: 8px 12px;
+      border-radius: 7px;
+      margin-top: 2px;
+    }
+    .coord-item {
+      display: flex;
+      flex-direction: column;
+    }
+    .coord-label {
+      font-size: 0.62rem;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #888888;
+      font-weight: 700;
+    }
+    .coord-value {
+      font-size: 0.76rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      color: #ffffff;
+      font-weight: 600;
+    }
+
+    .flight-status {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      background: #0a0a0a;
+      padding: 9px 14px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 0.74rem;
+      font-weight: 600;
+      color: #ffffff;
+    }
+    .status-dot {
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+    .status-dot.idle {
+      background: #ffffff;
+      box-shadow: 0 0 6px rgba(255, 255, 255, 0.6);
+    }
+    .status-dot.animating {
+      background: #ffffff;
+      box-shadow: 0 0 10px #ffffff;
+      animation: pulse 1s infinite alternate;
+    }
+    @keyframes pulse {
+      0% { transform: scale(0.85); opacity: 0.4; }
+      100% { transform: scale(1.2); opacity: 1; }
+    }
+
+    .nav-instructions {
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      background: #0a0a0a;
+      padding: 10px 14px;
+      border-radius: 7px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    .nav-header-row {
+      border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+      padding-bottom: 4px;
+      margin-bottom: 2px;
+    }
+    .nav-title {
+      font-size: 0.64rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      color: #888888;
+    }
+    .instruction-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-size: 0.72rem;
+      color: #cccccc;
+    }
+    .instruction-action {
+      color: #999999;
+    }
+    kbd {
+      background: #000000;
+      color: #ffffff;
+      padding: 2px 6px;
+      border-radius: 4px;
+      font-size: 0.65rem;
+      font-family: inherit;
+      border: 1px solid rgba(255, 255, 255, 0.22);
+    }
+
+    /* Multi-Photo Gallery & Lightbox */
+    .embedded-gallery-box {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 7px;
+      padding: 8px;
+      margin-top: 4px;
+    }
+    .embedded-photo-stage {
+      position: relative;
+      width: 100%;
+      height: 190px;
+      background: #000000;
+      border-radius: 7px;
+      overflow: hidden;
+      cursor: pointer;
+      border: 1px solid rgba(255, 255, 255, 0.08);
+    }
+    .embedded-main-photo {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      transition: transform 0.35s ease;
+    }
+    .embedded-photo-stage:hover .embedded-main-photo {
+      transform: scale(1.03);
+    }
+    .photo-tag-pill {
+      position: absolute;
+      top: 8px;
+      left: 8px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      font-size: 0.6rem;
+      font-weight: 700;
+      letter-spacing: 0.08em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 4px;
+      z-index: 2;
+    }
+    .photo-counter-badge {
+      position: absolute;
+      top: 8px;
+      right: 8px;
+      background: rgba(0, 0, 0, 0.85);
+      backdrop-filter: blur(8px);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      font-size: 0.62rem;
+      font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+      font-weight: 600;
+      padding: 2px 6px;
+      border-radius: 4px;
+      z-index: 2;
+    }
+    .photo-arrow-btn {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 28px;
+      height: 36px;
+      background: rgba(0, 0, 0, 0.75);
+      backdrop-filter: blur(4px);
+      color: #ffffff;
+      border: 1px solid rgba(255, 255, 255, 0.25);
+      border-radius: 4px;
+      font-size: 1.1rem;
+      font-weight: 400;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 3;
+    }
+    .photo-arrow-btn:hover {
+      background: #ffffff;
+      color: #000000;
+      border-color: #ffffff;
+    }
+    .photo-arrow-btn.prev { left: 6px; }
+    .photo-arrow-btn.next { right: 6px; }
+    .embedded-caption-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 2px 2px;
+    }
+    .embedded-photo-title {
+      font-size: 0.76rem;
+      font-weight: 700;
+      color: #ffffff;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      flex: 1;
+    }
+    .thumbnail-strip {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 6px;
+      width: 100%;
+    }
+    .thumb-btn {
+      position: relative;
+      height: 48px;
+      background: #000000;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      border-radius: 7px;
+      overflow: hidden;
+      padding: 0;
+      cursor: pointer;
+      transition: border-color 0.15s;
+    }
+    .thumb-btn:hover { border-color: rgba(255, 255, 255, 0.5); }
+    .thumb-btn.active { border: 2px solid #ffffff; }
+    .strip-thumb-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0.7;
+    }
+    .thumb-btn.active .strip-thumb-img { opacity: 1; }
+  </style>
+</head>
+<body>
+  <div id="cesiumContainer"></div>
+
+  <aside class="hud-panel">
+    <header class="hud-header">
+      <div class="header-top-row">
+        <span id="uiInstitution" class="institution-eyebrow">Patrimoine Architectural Français</span>
+        <div class="lang-switcher" role="group" aria-label="Langue">
+          <button id="langFrBtn" type="button" class="lang-btn active">FR</button>
+          <span class="lang-sep">|</span>
+          <button id="langEnBtn" type="button" class="lang-btn">EN</button>
+        </div>
+      </div>
+      <h1 id="uiTitle">Monuments de France</h1>
+      <p id="uiSubtitle" class="subtitle">Visualisation cartographique 3D des grands édifices historiques en région.</p>
+    </header>
+
+    <section class="control-card">
+      <div class="selector-header">
+        <label id="uiSelectLabel" class="field-label" for="monumentSelect">Sélectionner un édifice</label>
+        <span id="counterTag" class="counter-tag">Édifice 1 / 10</span>
+      </div>
+      <div class="dropdown-row">
+        <select id="monumentSelect"></select>
+      </div>
+
+      <div class="stepper-buttons">
+        <button id="prevBtn" class="btn btn-secondary">‹ Précédent</button>
+        <button id="nextBtn" class="btn btn-secondary">Suivant ›</button>
+        <button id="orbitBtn" class="btn btn-accent">Rotation 360°</button>
+      </div>
+
+      <!-- Perspective Tabs -->
+      <div class="view-mode-tabs" role="tablist">
+        <button id="tabGlobeBtn" type="button" class="view-tab-btn active">Aérien 3D</button>
+        <button id="tabInteriorBtn" type="button" class="view-tab-btn">Intérieur & Trésors</button>
+        <button id="tabLandscapeBtn" type="button" class="view-tab-btn">Montagnes & Relief</button>
+      </div>
+
+      <div id="layerSwitcherRow" class="layer-switcher-row">
+        <span id="uiLayerLabel" class="layer-label">Fond Cartographique :</span>
+        <div class="layer-btn-group" role="group">
+          <button id="layerSatBtn" type="button" class="layer-btn active">Satellite</button>
+          <button id="layerHybBtn" type="button" class="layer-btn">Hybride</button>
+          <button id="layerStrBtn" type="button" class="layer-btn">Plan Urbain</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- Monument Dynamic Card -->
+    <article id="monumentCard" class="monument-card">
+      <!-- Injected via JavaScript based on view mode -->
+    </article>
+
+    <div class="flight-status">
+      <span id="statusDot" class="status-dot animating"></span>
+      <span id="statusText">Initialisation de la vue terrestre...</span>
+    </div>
+
+    <footer class="nav-instructions">
+      <div class="nav-header-row">
+        <span id="uiNavHeader" class="nav-title">Commandes de Navigation</span>
+      </div>
+      <div class="instruction-item">
+        <span id="uiNavPan" class="instruction-action">Rotation & Déplacement</span>
+        <kbd id="uiKeyPan">Clic gauche + glisser</kbd>
+      </div>
+      <div class="instruction-item">
+        <span id="uiNavTilt" class="instruction-action">Orbite & Inclinaison 3D</span>
+        <kbd id="uiKeyTilt">Clic milieu ou Ctrl + glisser</kbd>
+      </div>
+      <div class="instruction-item">
+        <span id="uiNavZoom" class="instruction-action">Zoom avant / arrière</span>
+        <kbd id="uiKeyZoom">Molette de la souris</kbd>
+      </div>
+    </footer>
+  </aside>
+
+  <script>
+    const MONUMENTS = [
+  {
+    id: "mont-saint-michel",
+    name: {
+      fr: "Abbaye du Mont-Saint-Michel",
+      en: "Mont-Saint-Michel Abbey"
+    },
+    city: "Le Mont-Saint-Michel",
+    department: {
+      fr: "Manche, Normandie",
+      en: "Manche, Normandy"
+    },
+    latitude: 48.636014,
+    longitude: -1.511457,
+    elevation: 80,
+    camera: {
+      range: 480,
+      heading: 35,
+      pitch: -28
+    },
+    cameraLandscape: {
+      range: 2200,
+      heading: 350,
+      pitch: -12
+    },
+    era: {
+      fr: "VIIIe – XVIe siècle",
+      en: "8th – 16th century"
+    },
+    description: {
+      fr: "Prouesse architecturale du Moyen Âge, cette abbaye bénédictine s'élève sur un îlot rocheux ceinturé par les plus puissantes marées d'Europe.",
+      en: "A masterpiece of medieval architecture, this Benedictine abbey stands atop a rocky tidal island subject to some of Europe's strongest tides."
+    },
+    historicalNote: {
+      fr: "Inscrite au patrimoine mondial de l'UNESCO dès 1979, la forteresse abbatiale demeura imprenable face aux assauts anglais durant la guerre de Cent Ans.",
+      en: "Inscribed on the UNESCO World Heritage List in 1979, the abbey fortress withstood all English sieges throughout the Hundred Years' War."
+    },
+    interior: {
+      image: "/images/monuments/mont-saint-michel-interior.jpg",
+      title: {
+        fr: "Le Cloître suspendu & La Merveille",
+        en: "The Suspended Cloister & The Merveille"
+      },
+      highlight: {
+        fr: "Véritable jardin suspendu entre ciel et mer, le cloître du XIIIe siècle présente une double rangée de colonnettes en quinconce de calcaire anglais, offrant un silence absolu au sommet de la falaise.",
+        en: "A garden suspended between sea and sky, this 13th-century cloister features staggered double colonnettes carved from English limestone, designed as a contemplative haven atop the sea cliff."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/mont-saint-michel-landscape.jpg",
+      title: {
+        fr: "La Baie, Marées & Grèves de Normandie",
+        en: "The Tidal Bay & Maritime Horizon"
+      },
+      mountains: {
+        fr: "Bordée par les falaises côtières de Champeaux et les bancs de sables mouvants, la baie connaît un marnage exceptionnel atteignant 14 mètres, transformant le rocher en île deux fois par jour.",
+        en: "Flanked by the Champeaux coastal cliffs and vast quicksand flats, the bay experiences extreme 14-meter tides that isolate the rock into an island twice daily."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/mont-saint-michel-aerial.jpg",
+        title: { fr: "Vue Aérienne & Marée Haute", en: "Aerial View & High Tide" },
+        caption: {
+          fr: "Panorama aérien révélant l'insularité complète de l'abbaye ceinturée par les eaux de la baie.",
+          en: "Aerial panorama revealing the complete insularity of the abbey surrounded by tidal waters."
+        },
+        tag: { fr: "Aérien", en: "Aerial" }
+      },
+      {
+        src: "/images/monuments/mont-saint-michel-facade.jpg",
+        title: { fr: "La Merveille & Façade Gothique", en: "The Merveille & Gothic Facade" },
+        caption: {
+          fr: "Contreforts vertigineux de l'abbaye culminant à plus de 80 mètres au-dessus du niveau de la mer.",
+          en: "Dizzying buttresses of the abbey towering more than 80 meters above sea level."
+        },
+        tag: { fr: "Architecture", en: "Architecture" }
+      },
+      {
+        src: "/images/monuments/mont-saint-michel-interior.jpg",
+        title: { fr: "Le Cloître Suspendu", en: "The Suspended Cloister" },
+        caption: {
+          fr: "Double colonnade en quinconce de calcaire anglais taillée au XIIIe siècle.",
+          en: "Staggered double colonnade carved in English Caen limestone in the 13th century."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/mont-saint-michel-village.jpg",
+        title: { fr: "Grand-Rue & Village Médiéval", en: "Grand-Rue & Medieval Village" },
+        caption: {
+          fr: "Ruelle médiévale pavée bordée de maisons séculaires montant vers les remparts abbatiaux.",
+          en: "Cobbled medieval street lined with historic merchant houses ascending to the ramparts."
+        },
+        tag: { fr: "Village", en: "Village" }
+      },
+      {
+        src: "/images/monuments/mont-saint-michel-landscape.jpg",
+        title: { fr: "Les Grèves & la Baie Sauvage", en: "Tidal Flats & Wild Bay" },
+        caption: {
+          fr: "Étendue d'estran et de sables mouvants soumise au plus grand marnage d'Europe continentale.",
+          en: "Vast expanse of tidal flats and quicksands subject to Europe's strongest tidal range."
+        },
+        tag: { fr: "Paysage", en: "Landscape" }
+      }
+    ]
+  },
+  {
+    id: "palais-des-papes",
+    name: {
+      fr: "Palais des Papes",
+      en: "Palace of the Popes"
+    },
+    city: "Avignon",
+    department: {
+      fr: "Vaucluse, Provence-Alpes-Côte d'Azur",
+      en: "Vaucluse, Provence-Alpes-Côte d'Azur"
+    },
+    latitude: 43.950712,
+    longitude: 4.807511,
+    elevation: 35,
+    camera: {
+      range: 420,
+      heading: 45,
+      pitch: -28
+    },
+    cameraLandscape: {
+      range: 2100,
+      heading: 65,
+      pitch: -11
+    },
+    era: {
+      fr: "XIVe siècle (1335 – 1352)",
+      en: "14th century (1335 – 1352)"
+    },
+    description: {
+      fr: "Plus imposante construction gothique du Moyen Âge occidental, forteresse et résidence souveraine de la papauté en Avignon.",
+      en: "The largest Gothic palace of the Western Middle Ages, serving as sovereign fortress and residence for the Avignon Papacy."
+    },
+    historicalNote: {
+      fr: "Édifié en moins de vingt ans sous les pontificats de Benoît XII et Clément VI, l'ensemble abrita six conclaves pontificaux majeurs.",
+      en: "Built in under two decades under Popes Benedict XII and Clement VI, the palace hosted six major papal conclaves."
+    },
+    interior: {
+      image: "/images/monuments/palais-des-papes-interior.jpg",
+      title: {
+        fr: "Le Grand Tinel & Chambre du Cerf",
+        en: "The Grand Tinel & Stag Chamber"
+      },
+      highlight: {
+        fr: "Immense salle de banquet papal de 48 mètres de long couverte d'une voûte en berceau brisé lambrissée, et la Chambre du Cerf ornée de somptueuses fresques profanes de scènes de chasse de 1343 peintes par Matteo Giovanetti.",
+        en: "Monumental 48-meter papal banquet hall with an inverted timber keel vault, complemented by the Stag Chamber featuring secular hunting frescoes painted in 1343 by Matteo Giovanetti."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/palais-des-papes-landscape.jpg",
+      title: {
+        fr: "Le Rhône, Rocher des Doms & Mont Ventoux",
+        en: "The Rhône River, Doms Rock & Mont Ventoux"
+      },
+      mountains: {
+        fr: "Bâti sur l'escarpement rocheux calcaire des Doms dominant le fleuve Rhône, avec au levant la silhouette majestueuse du Mont Ventoux (1 912 m) et les dentelles de Montmirail.",
+        en: "Erected upon the limestone Doms bluff commanding the Rhône river, framed on the eastern horizon by Mont Ventoux (1,912 m) and the jagged Dentelles de Montmirail range."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/palais-des-papes-facade.jpg",
+        title: { fr: "Façade Papale & Place du Palais", en: "Papal Facade & Palace Square" },
+        caption: {
+          fr: "Tours fortifiées et mâchicoulis massifs de la façade ouest dominant la grande place d'Avignon.",
+          en: "Fortified watchtowers and massive machicolations of the western facade commanding the main square."
+        },
+        tag: { fr: "Façade", en: "Facade" }
+      },
+      {
+        src: "/images/monuments/palais-des-papes-courtyard.jpg",
+        title: { fr: "Cour d'Honneur du Palais", en: "Courtyard of Honor" },
+        caption: {
+          fr: "Cour centrale du palais pontifical, théâtre emblématique des représentations du Festival d'Avignon.",
+          en: "Central courtyard of the papal fortress, world-famous stage of the annual Avignon Theatre Festival."
+        },
+        tag: { fr: "Cour", en: "Courtyard" }
+      },
+      {
+        src: "/images/monuments/palais-des-papes-interior.jpg",
+        title: { fr: "Le Grand Tinel & Voûte Lambrissée", en: "Grand Tinel & Timber Vault" },
+        caption: {
+          fr: "Salle d'apparat des banquets souverains des papes longue de 48 mètres avec sa charpente en carène.",
+          en: "Grand banquet and sovereign ceremonial hall spanning 48 meters with its inverted hull timber roof."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/palais-des-papes-bridge.jpg",
+        title: { fr: "Pont Saint-Bénézet sur le Rhône", en: "Saint-Bénézet Bridge on the Rhône" },
+        caption: {
+          fr: "Célèbre pont roman du XIIe siècle s'avançant dans les eaux tumultueuses du Rhône.",
+          en: "Legendary 12th-century Romanesque bridge reaching across the fast-flowing waters of the Rhône."
+        },
+        tag: { fr: "Lieu proche", en: "Nearby Landmark" }
+      },
+      {
+        src: "/images/monuments/palais-des-papes-landscape.jpg",
+        title: { fr: "Le Rhône & Rocher des Doms", en: "The Rhône & Doms Bluff" },
+        caption: {
+          fr: "Perspective fluviale depuis l'île de la Barthelasse avec le piton calcaire des Doms.",
+          en: "River perspective from Barthelasse Island showing the limestone citadel rock and palace silhouette."
+        },
+        tag: { fr: "Paysage", en: "Landscape" }
+      }
+    ]
+  },
+  {
+    id: "cite-carcassonne",
+    name: {
+      fr: "Cité de Carcassonne",
+      en: "Cité of Carcassonne"
+    },
+    city: "Carcassonne",
+    department: {
+      fr: "Aude, Occitanie",
+      en: "Aude, Occitanie"
+    },
+    latitude: 43.206972,
+    longitude: 2.363045,
+    elevation: 148,
+    camera: {
+      range: 580,
+      heading: 65,
+      pitch: -30
+    },
+    cameraLandscape: {
+      range: 2400,
+      heading: 10,
+      pitch: -12
+    },
+    era: {
+      fr: "Antiquité tardive – XIVe siècle",
+      en: "Late Antiquity – 14th century"
+    },
+    description: {
+      fr: "Ensemble fortifié d'une ampleur exceptionnelle, ceinturé de trois kilomètres de doubles remparts et de cinquante-deux tours dominant la vallée de l'Aude.",
+      en: "An exceptionally preserved fortified ensemble enclosed by 3 kilometers of double ramparts and 52 watchtowers overlooking the Aude valley."
+    },
+    historicalNote: {
+      fr: "Menacée de démolition au XIXe siècle, la cité fut sauvée et restaurée sous la direction de l'architecte Eugène Viollet-le-Duc.",
+      en: "Slated for demolition in the 19th century, the citadel was preserved and comprehensively restored under architect Eugène Viollet-le-Duc."
+    },
+    interior: {
+      image: "/images/monuments/cite-carcassonne-interior.jpg",
+      title: {
+        fr: "Cour du Château Comtal & Vitraux de Saint-Nazaire",
+        en: "Château Comtal Courtyard & Saint-Nazaire Stained Glass"
+      },
+      highlight: {
+        fr: "La cour d'honneur du château féodal avec ses mâchicoulis, et la basilique Saint-Nazaire ornée de chefs-d'œuvre de vitraux des XIIIe et XIVe siècles, dont le grand Arbre de Jessé aux bleus étincelants.",
+        en: "The feudal castle inner ward flanked by hoardings, alongside the Saint-Nazaire Basilica housing world-renowned 13th-century stained-glass masterpieces including the luminous Tree of Jesse."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/cite-carcassonne-landscape.jpg",
+      title: {
+        fr: "La Montagne Noire & Contreforts des Pyrénées",
+        en: "The Montagne Noire & Pyrenean Foothills"
+      },
+      mountains: {
+        fr: "Perchée sur un éperon dominant la vallée de l'Aude, la Cité s'inscrit dans un corridor stratégique adossé au nord à la Montagne Noire et au sud à la barrière blanche des Pyrénées.",
+        en: "Perched on a strategic promontory between the Montagne Noire granite massif to the north and the snow-capped Pyrenean cordillera to the south."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/cite-carcassonne-landscape.jpg",
+        title: { fr: "Vue Aérienne des Doubles Remparts", en: "Aerial View of Double Walls" },
+        caption: {
+          fr: "Système défensif concentrique de 3 kilomètres avec ses toitures coniques d'ardoises restaurées.",
+          en: "Concentric 3-kilometer defensive system with restored slate conical turret roofs."
+        },
+        tag: { fr: "Aérien", en: "Aerial" }
+      },
+      {
+        src: "/images/monuments/cite-carcassonne-gate.jpg",
+        title: { fr: "Porte Narbonnaise & Pont-Levis", en: "Narbonne Gate & Drawbridge" },
+        caption: {
+          fr: "Entrée monumentale fortifiée encadrée par deux puissantes tours en étrave à bossages.",
+          en: "Monumental fortified gatehouse flanked by twin bow-fronted ashlar masonry towers."
+        },
+        tag: { fr: "Architecture", en: "Architecture" }
+      },
+      {
+        src: "/images/monuments/cite-carcassonne-chateau.jpg",
+        title: { fr: "Château Comtal Féodal", en: "Count's Feudal Castle" },
+        caption: {
+          fr: "Forteresse intérieure du XIIe siècle ceinturée de fossés secs et de courtines crénelées.",
+          en: "12th-century inner stronghold protected by deep dry moats and crenellated curtain walls."
+        },
+        tag: { fr: "Château", en: "Castle" }
+      },
+      {
+        src: "/images/monuments/cite-carcassonne-interior.jpg",
+        title: { fr: "Cour d'Honneur & Vitraux Saint-Nazaire", en: "Courtyard & Saint-Nazaire" },
+        caption: {
+          fr: "Vitraux gothiques étincelants et cour d'honneur seigneuriale du château des comtes de Trencavel.",
+          en: "Radiant gothic stained glass windows and feudal courtyard of the Trencavel counts."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/cite-carcassonne-ramparts.jpg",
+        title: { fr: "Les Lices & 52 Tours de Garde", en: "Outer Wards & 52 Watchtowers" },
+        caption: {
+          fr: "Espace des lices entre la double enceinte médiévale surplombant les plaines de l'Aude.",
+          en: "The historic lists between the inner and outer defensive walls overlooking the Aude valley."
+        },
+        tag: { fr: "Remparts", en: "Ramparts" }
+      }
+    ]
+  },
+  {
+    id: "pont-du-gard",
+    name: {
+      fr: "Pont du Gard",
+      en: "Pont du Gard"
+    },
+    city: "Vers-Pont-du-Gard",
+    department: {
+      fr: "Gard, Occitanie",
+      en: "Gard, Occitanie"
+    },
+    latitude: 43.947565,
+    longitude: 4.534960,
+    elevation: 50,
+    camera: {
+      range: 430,
+      heading: 130,
+      pitch: -25
+    },
+    cameraLandscape: {
+      range: 1600,
+      heading: 240,
+      pitch: -13
+    },
+    era: {
+      fr: "Ier siècle après J.-C. (vers 40–60)",
+      en: "1st century AD (c. 40–60 AD)"
+    },
+    description: {
+      fr: "Ouvrage d'art antique à trois étages d'arches culminant à 48,8 mètres, franchissant le lit du Gardon pour alimenter Nîmes en eau.",
+      en: "Ancient Roman three-tiered aqueduct bridge standing 48.8 meters high, crossing the Gardon gorge to supply water to Nîmes."
+    },
+    historicalNote: {
+      fr: "Construit en pierre de calcaire coquillier sans mortier, il assurait un débit quotidien moyen de 35 000 à 40 000 m³ d'eau courante.",
+      en: "Erected without mortar from shelly limestone blocks, the conduit carried 35,000 to 40,000 cubic meters of fresh water per day."
+    },
+    interior: {
+      image: "/images/monuments/pont-du-gard-interior.jpg",
+      title: {
+        fr: "Le Specus : Conduit d'Eau Romain Antique",
+        en: "The Specus: Ancient Roman Water Conduit"
+      },
+      highlight: {
+        fr: "À l'étage supérieur (3e niveau), le canal intérieur couvert (specus) de 1,80 m de haut et 1,20 m de large conserve son étanchéité en mortier de tuileau rouge (opus signinum) et les concrétions calcaires romaines millénaires.",
+        en: "Inside the topmost 3rd tier, the covered water conduit (specus) measures 1.80m tall, preserving Roman waterproof red tile mortar (opus signinum) and thick antique mineral concretions."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/pont-du-gard-landscape.jpg",
+      title: {
+        fr: "Les Gorges du Gardon & le Massif Méditerranéen",
+        en: "The Gardon Gorges & Mediterranean Canyon"
+      },
+      mountains: {
+        fr: "Enjambant la brèche spectaculaire creusée par le Gardon au milieu d'un plateau de garrigues rocheuses arides, d'oliviers centenaires et de falaises calcaires vertigineuses.",
+        en: "Spanning a dramatic limestone canyon carved by the river Gardon amidst rugged Mediterranean scrubland, centenarian olive groves, and vertical cliffs."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/pont-du-gard-arches.jpg",
+        title: { fr: "Les Trois Étages d'Arches Antiques", en: "Three Tiers of Roman Arches" },
+        caption: {
+          fr: "Chef-d'œuvre de stéréotomie romaine construit en blocs calcaires pesant jusqu'à six tonnes posés sans mortier.",
+          en: "Masterpiece of Roman stereotomy built without mortar from shelly limestone blocks weighing up to six tons."
+        },
+        tag: { fr: "Architecture", en: "Architecture" }
+      },
+      {
+        src: "/images/monuments/pont-du-gard-river.jpg",
+        title: { fr: "Reflet sur le Gardon", en: "Gardon River Reflection" },
+        caption: {
+          fr: "Perspective au ras de l'eau turquoise du Gardon reflétant la symétrie grandiose des arches romaines.",
+          en: "Water-level perspective across the turquoise Gardon river reflecting the grandeur of Roman arches."
+        },
+        tag: { fr: "Rivière", en: "River" }
+      },
+      {
+        src: "/images/monuments/pont-du-gard-interior.jpg",
+        title: { fr: "Le Specus (Conduit Intérieur)", en: "The Specus (Roman Conduit)" },
+        caption: {
+          fr: "Conduit supérieur antique enduit d'opus signinum rouge acheminant l'eau par gravité vers Nîmes.",
+          en: "Upper conduit sealed with red Roman waterproof mortar carrying spring water toward Nîmes."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/pont-du-gard-sunset.jpg",
+        title: { fr: "Crépuscule Doré sur l'Aqueduc", en: "Golden Hour Sunset on Aqueduct" },
+        caption: {
+          fr: "Lumière crépusculaire embrasant la pierre ocre-dorée du calcaire coquillier de Vers.",
+          en: "Golden Mediterranean twilight illuminating the honey-colored Vers limestone arches."
+        },
+        tag: { fr: "Ambiance", en: "Atmosphere" }
+      },
+      {
+        src: "/images/monuments/pont-du-gard-landscape.jpg",
+        title: { fr: "Les Gorges du Gardon & la Garrigue", en: "Gardon Gorges & Garrigue" },
+        caption: {
+          fr: "Cadre naturel sauvage et classé des falaises calcaires et sentiers de garrigue méditerranéenne.",
+          en: "Pristine protected canyon framed by limestone cliffs and fragrant Mediterranean garrigue."
+        },
+        tag: { fr: "Nature", en: "Nature" }
+      }
+    ]
+  },
+  {
+    id: "cathedrale-strasbourg",
+    name: {
+      fr: "Cathédrale Notre-Dame de Strasbourg",
+      en: "Strasbourg Cathedral"
+    },
+    city: "Strasbourg",
+    department: {
+      fr: "Bas-Rhin, Grand Est",
+      en: "Bas-Rhin, Grand Est"
+    },
+    latitude: 48.581845,
+    longitude: 7.750915,
+    elevation: 142,
+    camera: {
+      range: 460,
+      heading: 20,
+      pitch: -28
+    },
+    cameraLandscape: {
+      range: 2600,
+      heading: 265,
+      pitch: -12
+    },
+    era: {
+      fr: "1176 – 1439",
+      en: "1176 – 1439"
+    },
+    description: {
+      fr: "Sommet du gothique rhénan taillé en grès rose des Vosges, réputé pour sa façade ciselée comme une dentelle et son horloge astronomique.",
+      en: "Pinnacle of Rhenish Gothic carved from pink Vosges sandstone, renowned for its delicate lace-like façade and astronomical clock."
+    },
+    historicalNote: {
+      fr: "Avec sa flèche unique culminant à 142 mètres, elle constitua le plus haut édifice de la chrétienté et du monde de 1647 à 1874.",
+      en: "With its single 142-meter spire, it was the tallest architectural structure in the world from 1647 to 1874."
+    },
+    interior: {
+      image: "/images/monuments/cathedrale-strasbourg-interior.jpg",
+      title: {
+        fr: "L'Horloge Astronomique & le Pilier des Anges",
+        en: "The Astronomical Clock & Pillar of Angels"
+      },
+      highlight: {
+        fr: "Chef-d'œuvre mécanique de la Renaissance conçu en 1574 par des mathématiciens et orfèvres suisses, doté d'automates sonnant à midi et d'un comput ecclésiastique perpétuel, dressé devant le grandiose Pilier du Jugement Dernier.",
+        en: "Renaissance mechanical marvel constructed in 1574 featuring moving automata depicting the ages of man and apostles at solar noon, standing before the sculpted Last Judgment Pillar."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/cathedrale-strasbourg-landscape.jpg",
+      title: {
+        fr: "Les Crêtes des Vosges & la Plaine d'Alsace",
+        en: "The Vosges Mountain Crests & Alsatian Plain"
+      },
+      mountains: {
+        fr: "Érigée au centre de la plaine du Rhin, la cathédrale est bordée à l'ouest par la chaîne bleutée des Vosges (point culminant au Grand Ballon à 1 424 m) et à l'est par la Forêt-Noire.",
+        en: "Dominating the Rhine river basin, framed to the west by the blue crests of the Vosges Mountain range (Grand Ballon 1,424 m) and eastward by the Black Forest."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/cathedrale-strasbourg-facade.jpg",
+        title: { fr: "Dentelle de Grès Rose des Vosges", en: "Pink Sandstone Lace Facade" },
+        caption: {
+          fr: "Façade occidentale ciselée comme de l'orfèvrerie avec ses milliers de figures sculptées et sa grande rose.",
+          en: "Western facade sculpted like fine lacework with thousands of relief figures and giant rose window."
+        },
+        tag: { fr: "Façade", en: "Facade" }
+      },
+      {
+        src: "/images/monuments/cathedrale-strasbourg-interior.jpg",
+        title: { fr: "Horloge Astronomique & Pilier des Anges", en: "Astronomical Clock & Pillar" },
+        caption: {
+          fr: "Mécanisme Renaissance de 1574 animant les automates des apôtres devant le Pilier du Jugement.",
+          en: "1574 Renaissance mechanical marvel animating apostolic figures before the Last Judgment column."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/cathedrale-strasbourg-petitefrance.jpg",
+        title: { fr: "Canaux de la Petite France", en: "Petite France Canals View" },
+        caption: {
+          fr: "Perspective sur la flèche gothique s'élevant au-dessus des maisons à colombages des tanneurs.",
+          en: "Distant view of the cathedral spire soaring above half-timbered tanner houses along the Ill river."
+        },
+        tag: { fr: "Quartier", en: "Historic District" }
+      },
+      {
+        src: "/images/monuments/cathedrale-strasbourg-landscape.jpg",
+        title: { fr: "Vue depuis le Barrage Vauban", en: "View from Vauban Dam" },
+        caption: {
+          fr: "Vue panoramique embrassant les Ponts Couverts, les tours médiévales et la silhouette de la cathédrale.",
+          en: "Panoramic view taking in the Ponts Couverts, medieval towers, and the towering cathedral silhouette."
+        },
+        tag: { fr: "Panorama", en: "Panorama" }
+      },
+      {
+        src: "/images/monuments/cathedrale-strasbourg-facade.jpg",
+        title: { fr: "La Flèche Gothique de 142 Mètres", en: "The 142m Gothic Spire" },
+        caption: {
+          fr: "Plus haute structure humaine du monde pendant plus de deux siècles (1647 à 1874).",
+          en: "Tallest architectural construction in the world for more than two centuries (1647 to 1874)."
+        },
+        tag: { fr: "Flèche", en: "Spire" }
+      }
+    ]
+  },
+  {
+    id: "cathedrale-rouen",
+    name: {
+      fr: "Cathédrale Notre-Dame de Rouen",
+      en: "Rouen Cathedral"
+    },
+    city: "Rouen",
+    department: {
+      fr: "Seine-Maritime, Normandie",
+      en: "Seine-Maritime, Normandy"
+    },
+    latitude: 49.440239,
+    longitude: 1.094833,
+    elevation: 25,
+    camera: {
+      range: 440,
+      heading: 30,
+      pitch: -28
+    },
+    cameraLandscape: {
+      range: 2200,
+      heading: 120,
+      pitch: -13
+    },
+    era: {
+      fr: "XIIe – XVIe siècle",
+      en: "12th – 16th century"
+    },
+    description: {
+      fr: "Cathédrale d'un gothique flamboyant éclatant, couronnée par une flèche en fonte de 151 mètres qui domine la boucle de la Seine.",
+      en: "Flamboyant Gothic cathedral crowned by a 151-meter cast-iron spire dominating the lower Seine river valley."
+    },
+    historicalNote: {
+      fr: "Claude Monet y consacra sa célèbre série de plus de trente toiles; la crypte abrite le reliquaire renfermant le cœur de Richard Cœur de Lion.",
+      en: "Subject of Claude Monet's famous series of over 30 paintings; the crypt preserves the heart of King Richard the Lionheart."
+    },
+    interior: {
+      image: "/images/monuments/cathedrale-rouen-interior.jpg",
+      title: {
+        fr: "Le Chœur Gothique & Cœur de Richard Cœur de Lion",
+        en: "The Gothic Choir & Heart of Richard the Lionheart"
+      },
+      highlight: {
+        fr: "Élévation vertigineuse à 28 mètres sous voûte, le chœur du XIIIe siècle conserve les gisants sculptés des ducs de Normandie et le tombeau solennel renfermant le cœur embaumé du roi d'Angleterre Richard Ier.",
+        en: "Soaring 28-meter choir containing the sculpted effigies of the Norman Dukes and the historic tomb housing the embalmed heart of King Richard the Lionheart."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/cathedrale-rouen-landscape.jpg",
+      title: {
+        fr: "La Côte Sainte-Catherine & les Falaises de la Seine",
+        en: "Sainte-Catherine Hill & the Chalk River Cliffs"
+      },
+      mountains: {
+        fr: "Nichée dans un méandre encaissé de la Seine, la cathédrale est surplombée par la haute falaise de craie de la colline Sainte-Catherine (140 m), d'où Monet et Turner peignirent la ville.",
+        en: "Cradled within an entrenched meander of the Seine valley, bordered by the steep 140-meter white chalk promontory of Sainte-Catherine painted by Monet and Turner."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/cathedrale-rouen-facade.jpg",
+        title: { fr: "Portail Occidental & Série de Monet", en: "West Portal & Monet Series" },
+        caption: {
+          fr: "Façade de dentelle flamboyante peinte par Claude Monet à différentes heures du jour.",
+          en: "Flamboyant gothic portal studied by Monet across more than 30 Impressionist canvases."
+        },
+        tag: { fr: "Façade", en: "Facade" }
+      },
+      {
+        src: "/images/monuments/cathedrale-rouen-spire.jpg",
+        title: { fr: "Flèche de Fonte (151 m) & Tour de Beurre", en: "Cast-Iron Spire (151m) & Butter Tower" },
+        caption: {
+          fr: "Plus haute flèche de France culminant à 151 mètres au-dessus des toits normands.",
+          en: "Tallest cathedral spire in France soaring 151 meters above the historic roofs of Rouen."
+        },
+        tag: { fr: "Flèche", en: "Spire" }
+      },
+      {
+        src: "/images/monuments/cathedrale-rouen-interior.jpg",
+        title: { fr: "Chœur Gothique & Gisants des Ducs", en: "Gothic Choir & Norman Tombs" },
+        caption: {
+          fr: "Vaisseau du XIIIe siècle abritant la sépulture et le cœur de Richard Cœur de Lion.",
+          en: "13th-century vaulted choir preserving the sculpted tomb of King Richard the Lionheart."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/cathedrale-rouen-streets.jpg",
+        title: { fr: "Rues Pavées Médiévales & Gros-Horloge", en: "Cobbled Streets & Gros-Horloge" },
+        caption: {
+          fr: "Perspective depuis les ruelles médiévales bordées de maisons à encorbellement.",
+          en: "Charming perspective from Rouen's timber-framed medieval pedestrian streets."
+        },
+        tag: { fr: "Quartier", en: "Old Town" }
+      },
+      {
+        src: "/images/monuments/cathedrale-rouen-landscape.jpg",
+        title: { fr: "Panorama depuis la Colline Sainte-Catherine", en: "Sainte-Catherine Hill Panorama" },
+        caption: {
+          fr: "Vue d'ensemble sur la boucle de la Seine et les flèches de la ville aux cent clochers.",
+          en: "Iconic overlook of the Seine river loop and the spires of the 'city of a hundred steeples'."
+        },
+        tag: { fr: "Panorama", en: "Panorama" }
+      }
+    ]
+  },
+  {
+    id: "notre-dame-de-la-garde",
+    name: {
+      fr: "Basilique Notre-Dame de la Garde",
+      en: "Notre-Dame de la Garde Basilica"
+    },
+    city: "Marseille",
+    department: {
+      fr: "Bouches-du-Rhône, Provence-Alpes-Côte d'Azur",
+      en: "Bouches-du-Rhône, Provence-Alpes-Côte d'Azur"
+    },
+    latitude: 43.284112,
+    longitude: 5.371302,
+    elevation: 154,
+    camera: {
+      range: 520,
+      heading: 330,
+      pitch: -25
+    },
+    cameraLandscape: {
+      range: 2500,
+      heading: 165,
+      pitch: -11
+    },
+    era: {
+      fr: "1853 – 1864 (Consécration en 1864)",
+      en: "1853 – 1864 (Consecrated 1864)"
+    },
+    description: {
+      fr: "Basilique romano-byzantine érigée sur un piton calcaire à 149 mètres d'altitude, veillant traditionnellement sur les navigateurs et la cité phocéenne.",
+      en: "Romano-Byzantine basilica erected on a 149-meter limestone outcrop, historically watching over mariners and the Mediterranean port."
+    },
+    historicalNote: {
+      fr: "Surmontée d'un campanile portant une statue monumentale de la Vierge à l'Enfant dorée à la feuille, haute de 11,2 mètres.",
+      en: "Topped with a bell tower bearing an 11.2-meter gilded bronze statue of the Virgin and Child, visible far out to sea."
+    },
+    interior: {
+      image: "/images/monuments/notre-dame-de-la-garde-interior.jpg",
+      title: {
+        fr: "Mosaïques Byzantines d'Or & Ex-Votos Maritimes",
+        en: "Byzantine Gold Mosaics & Marine Ex-Votos"
+      },
+      highlight: {
+        fr: "Somptueux dômes recouverts de plus de 12 millions de tesselles d'or et d'émail vénitien, accompagnés de centaines de maquettes de bateaux suspendues sous les voûtes et de tableaux ex-voto de marins rescapés de tempêtes.",
+        en: "Breathtaking cupolas adorned with over 12 million Venetian gold and colored glass mosaic tiles, enriched with hundreds of model ships suspended from the nave by grateful mariners."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/notre-dame-de-la-garde-landscape.jpg",
+      title: {
+        fr: "Le Massif des Calanques & la Mer Méditerranée",
+        en: "The Calanques Mountain Massif & Mediterranean"
+      },
+      mountains: {
+        fr: "Perchée sur le plus haut rocher de Marseille, la basilique offre une vue panoramique sur les falaises blanches vertigineuses du Massif des Calanques (Mont Puget 563 m) et les îles du Frioul.",
+        en: "Perched high on a limestone pinnacle, commanding a 360° panorama over the towering white sea cliffs of the Calanques National Park (Mont Puget 563 m) and the Frioul archipelago."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/notre-dame-de-la-garde-facade.jpg",
+        title: { fr: "Campanile & Vierge Dorée à l'Enfant", en: "Bell Tower & Gilded Virgin" },
+        caption: {
+          fr: "Statue monumentale de la Bonne Mère de 11 mètres dorée à la feuille veillant sur la Méditerranée.",
+          en: "11-meter gilded statue of the Bonne Mère looking out across the Mediterranean waters."
+        },
+        tag: { fr: "Architecture", en: "Architecture" }
+      },
+      {
+        src: "/images/monuments/notre-dame-de-la-garde-vieuxport.jpg",
+        title: { fr: "Surplombant le Vieux-Port", en: "Overlooking the Old Port" },
+        caption: {
+          fr: "Panorama spectaculaire plongeant sur les quais du Vieux-Port et le Fort Saint-Jean.",
+          en: "Spectacular commanding view over Marseille's 2,600-year-old Old Port and harbor fortresses."
+        },
+        tag: { fr: "Vue Urbaine", en: "Harbor View" }
+      },
+      {
+        src: "/images/monuments/notre-dame-de-la-garde-interior.jpg",
+        title: { fr: "Mosaïques d'Or & Maquettes Ex-Voto", en: "Gold Mosaics & Ship Models" },
+        caption: {
+          fr: "Douze millions de tesselles d'or vénitien et maquettes de navires suspendues par les marins rescapés.",
+          en: "Twelve million Venetian gold tesserae and model ships suspended by grateful surviving mariners."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/notre-dame-de-la-garde-sunset.jpg",
+        title: { fr: "Coucher de Soleil sur les Îles du Frioul", en: "Sunset over Frioul Islands" },
+        caption: {
+          fr: "Crépuscule méditerranéen flamboyant embrasant le Château d'If et l'archipel du Frioul.",
+          en: "Vibrant Mediterranean sunset setting the Château d'If and offshore islands ablaze with gold."
+        },
+        tag: { fr: "Crépuscule", en: "Sunset" }
+      },
+      {
+        src: "/images/monuments/notre-dame-de-la-garde-landscape.jpg",
+        title: { fr: "Massif des Calanques & Falaise Maritime", en: "Calanques Cliffs & Open Sea" },
+        caption: {
+          fr: "Piton calcaire escarpé s'élevant à 149 mètres face aux criques blanches et à la grande bleue.",
+          en: "Steep limestone peak rising 149 meters above sea level opposite the white fjord cliffs."
+        },
+        tag: { fr: "Paysage", en: "Landscape" }
+      }
+    ]
+  },
+  {
+    id: "arenes-arles",
+    name: {
+      fr: "Amphithéâtre romain d'Arles",
+      en: "Roman Amphitheatre of Arles"
+    },
+    city: "Arles",
+    department: {
+      fr: "Bouches-du-Rhône, Provence-Alpes-Côte d'Azur",
+      en: "Bouches-du-Rhône, Provence-Alpes-Côte d'Azur"
+    },
+    latitude: 43.677845,
+    longitude: 4.630985,
+    elevation: 20,
+    camera: {
+      range: 420,
+      heading: 140,
+      pitch: -30
+    },
+    cameraLandscape: {
+      range: 1800,
+      heading: 50,
+      pitch: -13
+    },
+    era: {
+      fr: "Vers 90 après J.-C. (Époque flavienne)",
+      en: "c. 90 AD (Flavian Dynasty)"
+    },
+    description: {
+      fr: "Arène romaine monumentale à deux niveaux de soixante arcades chacun, édifiée selon les principes architecturaux du Colisée de Rome.",
+      en: "Monumental Roman amphitheatre featuring two tiers of 60 arcades each, modeled after Rome's Colosseum."
+    },
+    historicalNote: {
+      fr: "Au Moyen Âge, l'amphithéâtre fut transformé en cité fortifiée fermée intégrant plus de deux cents habitations et quatre tours défensives.",
+      en: "During the Middle Ages, the arena was transformed into a self-contained walled citadel with over 200 residences and 4 defense towers."
+    },
+    interior: {
+      image: "/images/monuments/arenes-arles-interior.jpg",
+      title: {
+        fr: "La Piste Antique & les Gradins de la Cavea",
+        en: "The Ancient Arena Floor & Cavea Tiers"
+      },
+      highlight: {
+        fr: "Amphithéâtre elliptique de 136 mètres sur 107 mètres pouvant accueillir jusqu'à 21 000 spectateurs répartis sur trente-quatre rangs de gradins superposés, équipé d'un ingénieux réseau de vomitoires et de galeries concentriques voûtées.",
+        en: "Elliptical 136m by 107m amphitheatre accommodating up to 21,000 spectators across 34 stone tiers, served by an advanced network of barrel-vaulted vomitoria and circular corridors."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/arenes-arles-landscape.jpg",
+      title: {
+        fr: "Le Massif des Alpilles & la Plaine de Crau",
+        en: "The Alpilles Massif & Crau Plain"
+      },
+      mountains: {
+        fr: "Bordée à l'ouest par le cours du Rhône et à l'est par la crête calcaire blanche déchiquetée des Alpilles (point culminant aux Opies à 498 m), célébrée par Van Gogh.",
+        en: "Bordered westward by the wide Rhône river and to the east by the jagged white limestone crests of the Alpilles range celebrated by Van Gogh."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/arenes-arles-aerial.jpg",
+        title: { fr: "Vue Aérienne de l'Amphithéâtre", en: "Aerial View of the Roman Arena" },
+        caption: {
+          fr: "Colosse elliptique romain parfaitement intégré dans le tissu urbain préservé d'Arles.",
+          en: "Colossal Roman elliptical arena seamlessly woven into the historic urban fabric of Arles."
+        },
+        tag: { fr: "Aérien", en: "Aerial" }
+      },
+      {
+        src: "/images/monuments/arenes-arles-facade.jpg",
+        title: { fr: "Arcades Antiques en Calcaire de Fontvieille", en: "Roman Arches in Fontvieille Stone" },
+        caption: {
+          fr: "Deux étages de soixante arcades d'ordre dorique et corinthien taillées au Ier siècle.",
+          en: "Two tiers of 60 Doric and Corinthian arches carved from hard local limestone in the 1st century."
+        },
+        tag: { fr: "Architecture", en: "Architecture" }
+      },
+      {
+        src: "/images/monuments/arenes-arles-interior.jpg",
+        title: { fr: "La Piste Centrale & la Cavea", en: "Arena Floor & Ancient Cavea" },
+        caption: {
+          fr: "Gradins antiques restaurés accueillant encore corridas traditionnelles et festivals d'été.",
+          en: "Restored Roman stone tiers continuing to host summer spectacles and Provençal festivities."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/arenes-arles-evening.jpg",
+        title: { fr: "Illumination Crépusculaire Romaine", en: "Roman Evening Illumination" },
+        caption: {
+          fr: "Lumière crépusculaire révélant les tours médiévales et les arcades bimillénaires.",
+          en: "Nocturnal lighting accentuating the medieval watchtowers built atop the Roman arcades."
+        },
+        tag: { fr: "Nocturne", en: "Night" }
+      },
+      {
+        src: "/images/monuments/arenes-arles-landscape.jpg",
+        title: { fr: "Perspective sur les Toits & les Alpilles", en: "Rooftops & Alpilles Mountains" },
+        caption: {
+          fr: "Vue d'horizon s'ouvrant sur les collines calcaires provençales peintes par Vincent van Gogh.",
+          en: "Horizon view looking towards the rugged limestone Alpilles hills painted by Van Gogh."
+        },
+        tag: { fr: "Paysage", en: "Landscape" }
+      }
+    ]
+  },
+  {
+    id: "place-stanislas",
+    name: {
+      fr: "Place Stanislas",
+      en: "Place Stanislas"
+    },
+    city: "Nancy",
+    department: {
+      fr: "Meurthe-et-Moselle, Grand Est",
+      en: "Meurthe-et-Moselle, Grand Est"
+    },
+    latitude: 48.693582,
+    longitude: 6.183244,
+    elevation: 215,
+    camera: {
+      range: 380,
+      heading: 0,
+      pitch: -32
+    },
+    cameraLandscape: {
+      range: 2300,
+      heading: 270,
+      pitch: -12
+    },
+    era: {
+      fr: "1751 – 1755 (XVIIIe siècle classique)",
+      en: "1751 – 1755 (18th century Classical)"
+    },
+    description: {
+      fr: "Joyau de l'urbanisme des Lumières, ensemble architectural d'une rare élégance combinant pavillons classiques et grilles dorées à la feuille.",
+      en: "Crown jewel of Enlightenment urban design, uniting monumental classical pavilions and gilded wrought-iron gates."
+    },
+    historicalNote: {
+      fr: "Commandée par Stanislas Leszczynski, roi déchu de Pologne devenu duc de Lorraine, pour honorer son gendre le roi Louis XV de France.",
+      en: "Commissioned by Stanislas Leszczynski, exiled King of Poland and Duke of Lorraine, to honor his son-in-law Louis XV of France."
+    },
+    interior: {
+      image: "/images/monuments/place-stanislas-interior.jpg",
+      title: {
+        fr: "Le Grand Salon Carré de l'Hôtel de Ville",
+        en: "The Grand Salon of Nancy City Hall"
+      },
+      highlight: {
+        fr: "Somptueux salon d'apparat du XVIIIe siècle orné de lambris sculptés, de lustres monumentaux en cristal de Baccarat et d'immenses verrières en plein cintre donnant une vue plongeante directe sur l'ensemble de la Place Stanislas.",
+        en: "Sumptuous 18th-century ceremonial salon featuring hand-carved woodwork, monumental Baccarat crystal chandeliers, and arched windows surveying Place Stanislas."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/place-stanislas-landscape.jpg",
+      title: {
+        fr: "Le Plateau de Haye & les Collines de Lorraine",
+        en: "The Haye Forested Plateau & Lorraine Hills"
+      },
+      mountains: {
+        fr: "Encadrée par la vallée verdoyante de la Meurthe et le vaste plateau calcaire boisé de la forêt de Haye qui couronne l'horizon lorrain.",
+        en: "Nestled within the green Meurthe river basin, framed by the forested limestone cuesta and wooded hills of the Haye plateau."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/place-stanislas-fountain.jpg",
+        title: { fr: "Fontaine de Neptune & d'Amphitrite", en: "Neptune & Amphitrite Fountain" },
+        caption: {
+          fr: "Chef-d'œuvre de plomb sculpté de Guibal niché sous les grilles royales en fer forgé.",
+          en: "Baroque lead sculpture by Guibal sheltered beneath Lamour's monumental gilded ironwork."
+        },
+        tag: { fr: "Fontaine", en: "Fountain" }
+      },
+      {
+        src: "/images/monuments/place-stanislas-gates.jpg",
+        title: { fr: "Grilles Dorées à la Feuille de Jean Lamour", en: "Gilded Gates of Jean Lamour" },
+        caption: {
+          fr: "Dentelle de fer forgé rocaille rehaussée d'or fin marquant les angles de la place royale.",
+          en: "Exquisite Rococo wrought-iron screens accented in pure gold leaf guarding the plaza corners."
+        },
+        tag: { fr: "Ferronnerie", en: "Ironwork" }
+      },
+      {
+        src: "/images/monuments/place-stanislas-interior.jpg",
+        title: { fr: "Grand Salon de l'Hôtel de Ville", en: "City Hall Grand Reception Room" },
+        caption: {
+          fr: "Salon ducal orné de lustres de Baccarat et de boiseries dorées surplombant la place.",
+          en: "Ducal ceremonial salon with crystal chandeliers and gilded paneling directly overlooking the square."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/place-stanislas-night.jpg",
+        title: { fr: "Perspective Nocturne & Pavage Royal", en: "Nocturnal Illumination & Paving" },
+        caption: {
+          fr: "Illumination dorée mettant en valeur la symétrie parfaite des façades classiques d'Héré.",
+          en: "Warm golden floodlighting illuminating the harmonious classical proportions designed by Héré."
+        },
+        tag: { fr: "Nocturne", en: "Night" }
+      },
+      {
+        src: "/images/monuments/place-stanislas-landscape.jpg",
+        title: { fr: "L'Ensemble Ducal & le Parc de la Pépinière", en: "Ducal Complex & Pépinière Park" },
+        caption: {
+          fr: "Axe royal majestueux reliant la place Stanislas à l'arc Héré et à la place de la Carrière.",
+          en: "Grand ceremonial axis linking Place Stanislas to the Arc Héré and the historic ducal gardens."
+        },
+        tag: { fr: "Urbanisme", en: "Urban Design" }
+      }
+    ]
+  },
+  {
+    id: "cathedrale-reims",
+    name: {
+      fr: "Cathédrale Notre-Dame de Reims",
+      en: "Reims Cathedral"
+    },
+    city: "Reims",
+    department: {
+      fr: "Marne, Grand Est",
+      en: "Marne, Grand Est"
+    },
+    latitude: 49.253712,
+    longitude: 4.034045,
+    elevation: 88,
+    camera: {
+      range: 450,
+      heading: 75,
+      pitch: -28
+    },
+    cameraLandscape: {
+      range: 2200,
+      heading: 190,
+      pitch: -12
+    },
+    era: {
+      fr: "1211 – 1275",
+      en: "1211 – 1275"
+    },
+    description: {
+      fr: "Chef-d'œuvre du gothique classique réputé pour sa statuaire remarquable, dont la célèbre figure de l'Ange au Sourire ornant le portail occidental.",
+      en: "Masterpiece of High Gothic architecture distinguished by extensive statuary, including the famous Smiling Angel on the west portal."
+    },
+    historicalNote: {
+      fr: "Haut lieu de l'histoire monarchique française : trente-trois souverains légitimes y furent sacrés, de Louis VIII en 1223 à Charles X en 1825.",
+      en: "Sanctuary of French royal coronations: thirty-three monarchs were crowned within its nave between 1223 and 1825."
+    },
+    interior: {
+      image: "/images/monuments/cathedrale-reims-interior.jpg",
+      title: {
+        fr: "La Nef du Sacre & Vitraux de Marc Chagall",
+        en: "The Coronation Nave & Marc Chagall Stained Glass"
+      },
+      highlight: {
+        fr: "La nef majestueuse de 138 mètres où les rois de France recevaient l'onction sacrée, illuminée par les somptueux vitraux contemporains bleu cobalt créés par Marc Chagall en 1974 dans la chapelle axiale.",
+        en: "The solemn 138-meter nave where 33 French monarchs were anointed with holy oil, crowned by Marc Chagall's radiant cobalt blue stained-glass windows in the central axial chapel."
+      }
+    },
+    landscape: {
+      image: "/images/monuments/cathedrale-reims-landscape.jpg",
+      title: {
+        fr: "Le Parc Naturel de la Montagne de Reims",
+        en: "The Montagne de Reims Natural Park"
+      },
+      mountains: {
+        fr: "Dominée au sud par le relief boisé et les coteaux escarpés de la Montagne de Reims (286 m), couverte des plus prestigieux vignobles de Champagne et des célèbres Faux de Verzy.",
+        en: "Framed to the south by the prominent wooded plateau and terraced slopes of the Montagne de Reims (286 m), blanketed in Grand Cru Champagne vineyards."
+      }
+    },
+    gallery: [
+      {
+        src: "/images/monuments/cathedrale-reims-facade.jpg",
+        title: { fr: "Façade Royale & Portails Sculptés", en: "Royal West Facade & Portals" },
+        caption: {
+          fr: "Plus de 2 300 statues ciselées ornent la façade gothique, sommet de la sculpture médiévale.",
+          en: "Over 2,300 sculpted figures grace the West facade, representing the pinnacle of medieval stonecraft."
+        },
+        tag: { fr: "Façade", en: "Facade" }
+      },
+      {
+        src: "/images/monuments/cathedrale-reims-angel.jpg",
+        title: { fr: "L'Ange au Sourire Emblématique", en: "The Smiling Angel of Reims" },
+        caption: {
+          fr: "Statue du XIIIe siècle devenue symbole universel de paix et de grâce artistique médiévale.",
+          en: "13th-century smiling angel statue revered worldwide as an emblem of medieval artistic grace."
+        },
+        tag: { fr: "Sculpture", en: "Sculpture" }
+      },
+      {
+        src: "/images/monuments/cathedrale-reims-rose.jpg",
+        title: { fr: "Grande Rose Occidentale & Vitraux", en: "Great West Rose Window" },
+        caption: {
+          fr: "Rose gothique de douze mètres de diamètre dédiée à la Dormition et au Couronnement de la Vierge.",
+          en: "12-meter diameter Gothic rose window depicting the Dormition and Coronation of the Virgin."
+        },
+        tag: { fr: "Vitraux", en: "Stained Glass" }
+      },
+      {
+        src: "/images/monuments/cathedrale-reims-interior.jpg",
+        title: { fr: "Nef des Sacres Royaux & Vitraux Chagall", en: "Coronation Nave & Chagall Windows" },
+        caption: {
+          fr: "Nef où furent sacrés trente-trois rois de France illuminée par les bleus de Marc Chagall.",
+          en: "Solemn nave where 33 French kings were crowned, bathed in cobalt light from Chagall's windows."
+        },
+        tag: { fr: "Intérieur", en: "Interior" }
+      },
+      {
+        src: "/images/monuments/cathedrale-reims-landscape.jpg",
+        title: { fr: "Vignobles de la Montagne de Reims", en: "Montagne de Reims Vineyards" },
+        caption: {
+          fr: "Coteaux champenois classés à l'UNESCO ceinturant la cathédrale des sacres de France.",
+          en: "UNESCO-listed Champagne hillside vineyards providing a picturesque backdrop to the coronation city."
+        },
+        tag: { fr: "Vignobles", en: "Vineyards" }
+      }
+    ]
+  }
+];
+
+    const UI_TRANSLATIONS = {
+      fr: {
+        institution: "Patrimoine Architectural Français",
+        title: "Monuments de France",
+        subtitle: "Visualisation cartographique 3D des grands édifices historiques en région.",
+        selectLabel: "Sélectionner un édifice",
+        counterPrefix: "Édifice",
+        btnPrev: "‹ Précédent",
+        btnNext: "Suivant ›",
+        btnOrbit: "Rotation 360°",
+        btnStopOrbit: "Arrêter l'orbite",
+        layerLabel: "Fond Cartographique :",
+        layerSat: "Satellite",
+        layerHyb: "Hybride",
+        layerStr: "Plan Urbain",
+        tabGlobe: "Aérien 3D",
+        tabInterior: "Intérieur & Trésors",
+        tabLandscape: "Montagnes & Relief",
+        interiorBadge: "CHEF-D'ŒUVRE & INTÉRIEUR",
+        landscapeBadge: "CADRE NATUREL & RELIEF",
+        periodLabel: "Époque :",
+        historicalLabel: "Notice Historique",
+        latLabel: "Latitude",
+        lonLabel: "Longitude",
+        altLabel: "Élévation",
+        stationaryStatus: "Stationnaire :",
+        flightStatus: "Déplacement caméra :",
+        earthStage: "Orbite terrestre",
+        franceStage: "Vue générale France",
+        navHeader: "Commandes de Navigation",
+        navPan: "Rotation & Déplacement",
+        navTilt: "Orbite & Inclinaison 3D",
+        navZoom: "Zoom avant / arrière",
+        keyPan: "Clic gauche + glisser",
+        keyTilt: "Clic milieu ou Ctrl + glisser",
+        keyZoom: "Molette de la souris"
+      },
+      en: {
+        institution: "French Architectural Heritage",
+        title: "Monuments of France",
+        subtitle: "3D geospatial survey of major historical landmarks across French regions.",
+        selectLabel: "Select Landmark",
+        counterPrefix: "Landmark",
+        btnPrev: "‹ Previous",
+        btnNext: "Next ›",
+        btnOrbit: "360° Orbit",
+        btnStopOrbit: "Stop Orbit",
+        layerLabel: "Cartographic Basemap:",
+        layerSat: "Satellite",
+        layerHyb: "Hybrid",
+        layerStr: "Urban Map",
+        tabGlobe: "3D Aerial",
+        tabInterior: "Interior & Treasures",
+        tabLandscape: "Mountains & Landscape",
+        interiorBadge: "INTERIOR MASTERPIECE",
+        landscapeBadge: "NATURAL SETTING & MOUNTAINS",
+        periodLabel: "Period:",
+        historicalLabel: "Historical Context",
+        latLabel: "Latitude",
+        lonLabel: "Longitude",
+        altLabel: "Elevation",
+        stationaryStatus: "Stationary:",
+        flightStatus: "Camera motion:",
+        earthStage: "Earth Orbit Overview",
+        franceStage: "National Overview (France)",
+        navHeader: "Navigation Controls",
+        navPan: "Rotate & Pan View",
+        navTilt: "3D Orbit & Tilt",
+        navZoom: "Zoom In / Out",
+        keyPan: "Left Click + Drag",
+        keyTilt: "Middle Click or Ctrl + Drag",
+        keyZoom: "Mouse Wheel"
+      }
+    };
+
+    const EARTH_GLOBAL_VIEW = { longitude: 2.2137, latitude: 46.2276, height: 11500000, heading: 0, pitch: -90 };
+    const FRANCE_MACRO_VIEW = { longitude: 2.3000, latitude: 46.5000, height: 1350000, heading: 0, pitch: -85 };
+
+    let currentLang = 'fr';
+    let currentMapLayer = 'satellite';
+    let currentViewMode = 'globe';
+    let activePhotoIdx = 0; // 'globe' | 'interior' | 'landscape'
+    let currentIndex = 0;
+    let isAnimating = false;
+    let isAutoOrbiting = false;
+    let orbitListener = null;
+    let orbitHeading = 0;
+    let markers = [];
+
+    // Initialize Cesium
+    const viewer = new Cesium.Viewer('cesiumContainer', {
+      animation: false,
+      timeline: false,
+      geocoder: false,
+      homeButton: false,
+      sceneModePicker: false,
+      baseLayerPicker: false,
+      navigationHelpButton: false,
+      fullscreenButton: false,
+      infoBox: false,
+      selectionIndicator: false
+    });
+
+    if (viewer.bottomContainer) {
+      viewer.bottomContainer.style.display = 'none';
+    }
+
+    viewer.scene.globe.enableLighting = true;
+    viewer.scene.globe.showGroundAtmosphere = true;
+    viewer.scene.globe.depthTestAgainstTerrain = true;
+    viewer.scene.highDynamicRange = true;
+    viewer.scene.skyAtmosphere.show = true;
+    viewer.scene.fog.enabled = true;
+    viewer.scene.fog.density = 0.00015;
+    viewer.scene.backgroundColor = Cesium.Color.BLACK;
+
+    function setBasemap(type) {
+      currentMapLayer = type;
+      viewer.imageryLayers.removeAll();
+
+      if (type === 'street') {
+        viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+          url: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+          subdomains: ['a', 'b', 'c'],
+          maximumLevel: 19,
+          credit: '© OpenStreetMap contributors'
+        }));
+      } else if (type === 'hybrid') {
+        viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19,
+          credit: '© Esri, Maxar'
+        }));
+        const refLayer = viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+          url: 'https://services.arcgisonline.com/ArcGIS/rest/services/Reference/World_Boundaries_and_Places/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19
+        }));
+        refLayer.alpha = 0.9;
+      } else {
+        viewer.imageryLayers.addImageryProvider(new Cesium.UrlTemplateImageryProvider({
+          url: 'https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',
+          maximumLevel: 19,
+          credit: '© Esri, Maxar'
+        }));
+      }
+
+      document.getElementById('layerSatBtn').className = `layer-btn ${type === 'satellite' ? 'active' : ''}`;
+      document.getElementById('layerHybBtn').className = `layer-btn ${type === 'hybrid' ? 'active' : ''}`;
+      document.getElementById('layerStrBtn').className = `layer-btn ${type === 'street' ? 'active' : ''}`;
+    }
+
+    setBasemap('satellite');
+
+    viewer.camera.setView({
+      destination: Cesium.Cartesian3.fromDegrees(EARTH_GLOBAL_VIEW.longitude, EARTH_GLOBAL_VIEW.latitude, EARTH_GLOBAL_VIEW.height),
+      orientation: { heading: Cesium.Math.toRadians(EARTH_GLOBAL_VIEW.heading), pitch: Cesium.Math.toRadians(EARTH_GLOBAL_VIEW.pitch), roll: 0.0 }
+    });
+
+    // Create 3D markers clamped accurately to ground
+    MONUMENTS.forEach(m => {
+      const entity = viewer.entities.add({
+        id: `marker-${m.id}`,
+        monumentId: m.id,
+        position: Cesium.Cartesian3.fromDegrees(m.longitude, m.latitude, 0),
+        point: {
+          pixelSize: 8,
+          color: Cesium.Color.WHITE,
+          outlineColor: Cesium.Color.BLACK,
+          outlineWidth: 2,
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        },
+        label: {
+          text: m.name[currentLang],
+          font: '600 11px -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
+          style: Cesium.LabelStyle.FILL,
+          fillColor: Cesium.Color.WHITE,
+          showBackground: true,
+          backgroundColor: Cesium.Color.fromCssColorString('rgba(0, 0, 0, 0.90)'),
+          backgroundPadding: new Cesium.Cartesian2(7, 4),
+          verticalOrigin: Cesium.VerticalOrigin.BOTTOM,
+          pixelOffset: new Cesium.Cartesian2(0, -12),
+          heightReference: Cesium.HeightReference.CLAMP_TO_GROUND,
+          disableDepthTestDistance: Number.POSITIVE_INFINITY
+        }
+      });
+      markers.push(entity);
+    });
+
+    // Click handler for 3D globe markers
+    const clickHandler = new Cesium.ScreenSpaceEventHandler(viewer.scene.canvas);
+    clickHandler.setInputAction((movement) => {
+      const picked = viewer.scene.pick(movement.position);
+      if (Cesium.defined(picked) && picked.id && picked.id.monumentId) {
+        const idx = MONUMENTS.findIndex(m => m.id === picked.id.monumentId);
+        if (idx !== -1) {
+          setViewMode('globe');
+          transitionToMonument(idx);
+        }
+      }
+    }, Cesium.ScreenSpaceEventType.LEFT_CLICK);
+
+    // DOM References
+    const langFrBtn = document.getElementById('langFrBtn');
+    const langEnBtn = document.getElementById('langEnBtn');
+    const uiInstitution = document.getElementById('uiInstitution');
+    const uiTitle = document.getElementById('uiTitle');
+    const uiSubtitle = document.getElementById('uiSubtitle');
+    const uiSelectLabel = document.getElementById('uiSelectLabel');
+    const counterTag = document.getElementById('counterTag');
+    const monumentSelect = document.getElementById('monumentSelect');
+    const prevBtn = document.getElementById('prevBtn');
+    const nextBtn = document.getElementById('nextBtn');
+    const orbitBtn = document.getElementById('orbitBtn');
+    const tabGlobeBtn = document.getElementById('tabGlobeBtn');
+    const tabInteriorBtn = document.getElementById('tabInteriorBtn');
+    const tabLandscapeBtn = document.getElementById('tabLandscapeBtn');
+    const layerSwitcherRow = document.getElementById('layerSwitcherRow');
+    const uiLayerLabel = document.getElementById('uiLayerLabel');
+    const layerSatBtn = document.getElementById('layerSatBtn');
+    const layerHybBtn = document.getElementById('layerHybBtn');
+    const layerStrBtn = document.getElementById('layerStrBtn');
+    const monumentCard = document.getElementById('monumentCard');
+    const statusDot = document.getElementById('statusDot');
+    const statusText = document.getElementById('statusText');
+    const uiNavHeader = document.getElementById('uiNavHeader');
+    const uiNavPan = document.getElementById('uiNavPan');
+    const uiNavTilt = document.getElementById('uiNavTilt');
+    const uiNavZoom = document.getElementById('uiNavZoom');
+    const uiKeyPan = document.getElementById('uiKeyPan');
+    const uiKeyTilt = document.getElementById('uiKeyTilt');
+    const uiKeyZoom = document.getElementById('uiKeyZoom');
+
+    function populateSelect() {
+      const selectedVal = monumentSelect.value !== '' ? parseInt(monumentSelect.value, 10) : currentIndex;
+      monumentSelect.innerHTML = '';
+      MONUMENTS.forEach((m, idx) => {
+        const opt = document.createElement('option');
+        opt.value = idx;
+        opt.textContent = `${idx + 1}. ${m.name[currentLang]} — ${m.city}`;
+        monumentSelect.appendChild(opt);
+      });
+      monumentSelect.value = selectedVal;
+    }
+
+    
+    function setPhoto(idx) {
+      activePhotoIdx = idx;
+      renderCard();
+    }
+    window.setPhoto = setPhoto;
+
+    function cyclePhoto(delta) {
+      const m = MONUMENTS[currentIndex];
+      const len = (m.gallery && m.gallery.length) || 2;
+      activePhotoIdx = (activePhotoIdx + delta + len) % len;
+      renderCard();
+    }
+    window.cyclePhoto = cyclePhoto;
+
+    function renderCard() {
+      const m = MONUMENTS[currentIndex];
+      const t = UI_TRANSLATIONS[currentLang];
+
+      if (currentViewMode === 'interior' && m.interior) {
+        monumentCard.innerHTML = `
+          <div class="card-top">
+            <span class="section-pill">${t.interiorBadge}</span>
+            <span class="department-label">${m.city}</span>
+          </div>
+          <h2 class="monument-title">${m.interior.title[currentLang]}</h2>
+          <div class="media-frame">
+            <img src="${m.interior.image}" alt="${m.interior.title[currentLang]}" class="monument-photo" />
+          </div>
+          <p class="monument-desc">${m.interior.highlight[currentLang]}</p>
+          <button type="button" class="btn btn-secondary return-btn" onclick="setViewMode('globe')">← ${t.tabGlobe}</button>
+        `;
+      } else if (currentViewMode === 'landscape' && m.landscape) {
+        monumentCard.innerHTML = `
+          <div class="card-top">
+            <span class="section-pill">${t.landscapeBadge}</span>
+            <span class="department-label">${m.city}</span>
+          </div>
+          <h2 class="monument-title">${m.landscape.title[currentLang]}</h2>
+          <div class="media-frame">
+            <img src="${m.landscape.image}" alt="${m.landscape.title[currentLang]}" class="monument-photo" />
+          </div>
+          <p class="monument-desc">${m.landscape.mountains[currentLang]}</p>
+          <button type="button" class="btn btn-secondary return-btn" onclick="setViewMode('globe')">← ${t.tabGlobe}</button>
+        `;
+      } else {
+        monumentCard.innerHTML = `
+          <div class="card-top">
+            <span class="city-label">${m.city.toUpperCase()}</span>
+            <span class="department-label">${m.department[currentLang]}</span>
+          </div>
+          <h2 class="monument-title">${m.name[currentLang]}</h2>
+          <div class="meta-line">
+            <span class="meta-term">${t.periodLabel}</span>
+            <span class="meta-desc">${m.era[currentLang]}</span>
+          </div>
+          <p class="monument-desc">${m.description[currentLang]}</p>
+          <div class="embedded-gallery-box">
+            <div class="embedded-photo-stage" onclick="cyclePhoto(1)" title="Faire défiler les photographies">
+              <img src="${(m.gallery && m.gallery[activePhotoIdx]) ? m.gallery[activePhotoIdx].src : m.interior.image}" alt="Photo" class="embedded-main-photo" />
+              <span class="photo-tag-pill">${(m.gallery && m.gallery[activePhotoIdx] && m.gallery[activePhotoIdx].tag) ? (m.gallery[activePhotoIdx].tag[currentLang] || m.gallery[activePhotoIdx].tag.fr) : 'Vue'}</span>
+              <span class="photo-counter-badge">${activePhotoIdx + 1} / ${(m.gallery ? m.gallery.length : 2)}</span>
+              <button type="button" class="photo-arrow-btn prev" onclick="event.stopPropagation(); cyclePhoto(-1);">‹</button>
+              <button type="button" class="photo-arrow-btn next" onclick="event.stopPropagation(); cyclePhoto(1);">›</button>
+            </div>
+            <div class="embedded-caption-bar">
+              <span class="embedded-photo-title">${(m.gallery && m.gallery[activePhotoIdx]) ? (m.gallery[activePhotoIdx].title[currentLang] || m.gallery[activePhotoIdx].title.fr) : ''}</span>
+            </div>
+            <div class="thumbnail-strip">
+              ${(m.gallery || []).map((p, idx) => `
+                <button type="button" class="thumb-btn ${idx === activePhotoIdx ? 'active' : ''}" onclick="setPhoto(${idx})">
+                  <img src="${p.src}" alt="thumb" class="strip-thumb-img" />
+                </button>
+              `).join('')}
+            </div>
+          </div>
+          <div class="historical-note-box">
+            <span class="historical-note-title">${t.historicalLabel}</span>
+            <p class="historical-note-text">${m.historicalNote[currentLang]}</p>
+          </div>
+          <div class="coords-strip">
+            <div class="coord-item">
+              <span class="coord-label">${t.latLabel}</span>
+              <span class="coord-value">${m.latitude.toFixed(6)}° N</span>
+            </div>
+            <div class="coord-item">
+              <span class="coord-label">${t.lonLabel}</span>
+              <span class="coord-value">${Math.abs(m.longitude).toFixed(6)}° ${m.longitude < 0 ? 'O' : 'E'}</span>
+            </div>
+            <div class="coord-item">
+              <span class="coord-label">${t.altLabel}</span>
+              <span class="coord-value">${m.elevation} m</span>
+            </div>
+          </div>
+        `;
+      }
+    }
+
+    function setViewMode(mode) {
+      currentViewMode = mode;
+      tabGlobeBtn.className = `view-tab-btn ${mode === 'globe' ? 'active' : ''}`;
+      tabInteriorBtn.className = `view-tab-btn ${mode === 'interior' ? 'active' : ''}`;
+      tabLandscapeBtn.className = `view-tab-btn ${mode === 'landscape' ? 'active' : ''}`;
+
+      layerSwitcherRow.style.display = mode === 'interior' ? 'none' : 'flex';
+
+      const target = MONUMENTS[currentIndex];
+      if (mode === 'landscape') {
+        flyToLandscapeHorizon(target, 2.2);
+      } else if (mode === 'globe') {
+        flyToMonumentAccurately(target, 2.2);
+      }
+
+      renderCard();
+    }
+
+    window.setViewMode = setViewMode;
+
+    function renderUI() {
+      const t = UI_TRANSLATIONS[currentLang];
+      uiInstitution.textContent = t.institution;
+      uiTitle.textContent = t.title;
+      uiSubtitle.textContent = t.subtitle;
+      uiSelectLabel.textContent = t.selectLabel;
+      counterTag.textContent = `${t.counterPrefix} ${currentIndex + 1} / ${MONUMENTS.length}`;
+      prevBtn.textContent = t.btnPrev;
+      nextBtn.textContent = t.btnNext;
+      orbitBtn.textContent = isAutoOrbiting ? t.btnStopOrbit : t.btnOrbit;
+      tabGlobeBtn.textContent = t.tabGlobe;
+      tabInteriorBtn.textContent = t.tabInterior;
+      tabLandscapeBtn.textContent = t.tabLandscape;
+      uiLayerLabel.textContent = `${t.layerLabel} :`;
+      layerSatBtn.textContent = t.layerSat;
+      layerHybBtn.textContent = t.layerHyb;
+      layerStrBtn.textContent = t.layerStr;
+      uiNavHeader.textContent = t.navHeader;
+      uiNavPan.textContent = t.navPan;
+      uiNavTilt.textContent = t.navTilt;
+      uiNavZoom.textContent = t.navZoom;
+      uiKeyPan.textContent = t.keyPan;
+      uiKeyTilt.textContent = t.keyTilt;
+      uiKeyZoom.textContent = t.keyZoom;
+
+      populateSelect();
+      renderCard();
+
+      markers.forEach((entity, idx) => {
+        if (entity && entity.label) {
+          entity.label.text = MONUMENTS[idx].name[currentLang];
+        }
+      });
+    }
+
+    function setControlsState(animating, statusMsg) {
+      isAnimating = animating;
+      monumentSelect.disabled = animating;
+      prevBtn.disabled = animating;
+      nextBtn.disabled = animating;
+      orbitBtn.disabled = animating;
+      const t = UI_TRANSLATIONS[currentLang];
+      if (animating) {
+        statusDot.className = 'status-dot animating';
+        statusText.textContent = `${t.flightStatus} ${statusMsg}`;
+      } else {
+        statusDot.className = 'status-dot idle';
+        statusText.textContent = `${t.stationaryStatus} ${MONUMENTS[currentIndex].name[currentLang]}`;
+      }
+    }
+
+    function flyToMonumentAccurately(monument, duration = 3.6) {
+      return new Promise(res => {
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        const center = Cesium.Cartesian3.fromDegrees(monument.longitude, monument.latitude, monument.elevation || 0);
+        const sphere = new Cesium.BoundingSphere(center, 20);
+        const offset = new Cesium.HeadingPitchRange(
+          Cesium.Math.toRadians(monument.camera.heading),
+          Cesium.Math.toRadians(monument.camera.pitch),
+          monument.camera.range
+        );
+        orbitHeading = Cesium.Math.toRadians(monument.camera.heading);
+
+        viewer.camera.flyToBoundingSphere(sphere, {
+          offset: offset,
+          duration: duration,
+          easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT,
+          complete: () => {
+            viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+            res();
+          },
+          cancel: () => {
+            viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+            res();
+          }
+        });
+      });
+    }
+
+    function flyToLandscapeHorizon(monument, duration = 2.6) {
+      return new Promise(res => {
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        const center = Cesium.Cartesian3.fromDegrees(monument.longitude, monument.latitude, monument.elevation || 0);
+        const sphere = new Cesium.BoundingSphere(center, 25);
+        const lp = monument.cameraLandscape || { range: 2200, heading: monument.camera.heading, pitch: -12 };
+        const offset = new Cesium.HeadingPitchRange(Cesium.Math.toRadians(lp.heading), Cesium.Math.toRadians(lp.pitch), lp.range);
+
+        viewer.camera.flyToBoundingSphere(sphere, {
+          offset: offset,
+          duration: duration,
+          easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT,
+          complete: () => {
+            viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+            res();
+          },
+          cancel: () => {
+            viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+            res();
+          }
+        });
+      });
+    }
+
+    function flyToMacro(dest, orient, duration) {
+      return new Promise(res => {
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+        viewer.camera.flyTo({
+          destination: dest,
+          orientation: orient,
+          duration: duration,
+          easingFunction: Cesium.EasingFunction.CUBIC_IN_OUT,
+          complete: () => res(),
+          cancel: () => res()
+        });
+      });
+    }
+
+    async function transitionToMonument(targetIndex, isInitial = false) {
+      stopAutoOrbit();
+      currentIndex = targetIndex;
+      monumentSelect.value = targetIndex;
+      const target = MONUMENTS[targetIndex];
+      renderCard();
+      const t = UI_TRANSLATIONS[currentLang];
+
+      if (isInitial) {
+        setControlsState(true, t.earthStage);
+        await new Promise(r => setTimeout(r, 900));
+
+        setControlsState(true, t.franceStage);
+        await flyToMacro(
+          Cesium.Cartesian3.fromDegrees(FRANCE_MACRO_VIEW.longitude, FRANCE_MACRO_VIEW.latitude, FRANCE_MACRO_VIEW.height),
+          { heading: Cesium.Math.toRadians(FRANCE_MACRO_VIEW.heading), pitch: Cesium.Math.toRadians(FRANCE_MACRO_VIEW.pitch), roll: 0.0 },
+          3.2
+        );
+
+        setControlsState(true, `${target.name[currentLang]} (${target.city})`);
+        await flyToMonumentAccurately(target, 3.8);
+      } else {
+        setControlsState(true, t.franceStage);
+        await flyToMacro(
+          Cesium.Cartesian3.fromDegrees(FRANCE_MACRO_VIEW.longitude, FRANCE_MACRO_VIEW.latitude, FRANCE_MACRO_VIEW.height),
+          { heading: Cesium.Math.toRadians(FRANCE_MACRO_VIEW.heading), pitch: Cesium.Math.toRadians(FRANCE_MACRO_VIEW.pitch), roll: 0.0 },
+          2.4
+        );
+
+        setControlsState(true, `${target.name[currentLang]} (${target.city})`);
+        await flyToMonumentAccurately(target, 3.4);
+      }
+
+      setControlsState(false);
+    }
+
+    function stopAutoOrbit() {
+      if (orbitListener) {
+        viewer.clock.onTick.removeEventListener(orbitListener);
+        orbitListener = null;
+        viewer.camera.lookAtTransform(Cesium.Matrix4.IDENTITY);
+      }
+      isAutoOrbiting = false;
+      orbitBtn.textContent = UI_TRANSLATIONS[currentLang].btnOrbit;
+      orbitBtn.className = 'btn btn-accent';
+    }
+
+    function startAutoOrbit() {
+      isAutoOrbiting = true;
+      orbitBtn.textContent = UI_TRANSLATIONS[currentLang].btnStopOrbit;
+      orbitBtn.className = 'btn btn-active';
+
+      const target = MONUMENTS[currentIndex];
+      const center = Cesium.Cartesian3.fromDegrees(target.longitude, target.latitude, target.elevation || 0);
+      const pitch = Cesium.Math.toRadians(target.camera.pitch);
+      const range = target.camera.range;
+      const inc = Cesium.Math.toRadians(0.25);
+
+      orbitListener = () => {
+        orbitHeading += inc;
+        viewer.camera.lookAt(center, new Cesium.HeadingPitchRange(orbitHeading, pitch, range));
+      };
+      viewer.clock.onTick.addEventListener(orbitListener);
+    }
+
+    orbitBtn.addEventListener('click', () => {
+      if (isAnimating) return;
+      if (isAutoOrbiting) stopAutoOrbit();
+      else startAutoOrbit();
+    });
+
+    monumentSelect.addEventListener('change', (e) => {
+      setViewMode('globe');
+      transitionToMonument(parseInt(e.target.value, 10));
+    });
+
+    prevBtn.addEventListener('click', () => {
+      const prev = (currentIndex - 1 + MONUMENTS.length) % MONUMENTS.length;
+      setViewMode('globe');
+      transitionToMonument(prev);
+    });
+
+    nextBtn.addEventListener('click', () => {
+      const next = (currentIndex + 1) % MONUMENTS.length;
+      setViewMode('globe');
+      transitionToMonument(next);
+    });
+
+    tabGlobeBtn.addEventListener('click', () => setViewMode('globe'));
+    tabInteriorBtn.addEventListener('click', () => setViewMode('interior'));
+    tabLandscapeBtn.addEventListener('click', () => setViewMode('landscape'));
+
+    langFrBtn.addEventListener('click', () => {
+      currentLang = 'fr';
+      langFrBtn.className = 'lang-btn active';
+      langEnBtn.className = 'lang-btn';
+      renderUI();
+    });
+
+    langEnBtn.addEventListener('click', () => {
+      currentLang = 'en';
+      langEnBtn.className = 'lang-btn active';
+      langFrBtn.className = 'lang-btn';
+      renderUI();
+    });
+
+    layerSatBtn.addEventListener('click', () => setBasemap('satellite'));
+    layerHybBtn.addEventListener('click', () => setBasemap('hybrid'));
+    layerStrBtn.addEventListener('click', () => setBasemap('street'));
+
+    renderUI();
+    transitionToMonument(0, true);
+  </script>
+</body>
+</html>
